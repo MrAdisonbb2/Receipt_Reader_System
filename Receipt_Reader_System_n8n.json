@@ -1,0 +1,322 @@
+{
+  "name": "Receipt_Reader_System_n8n",
+  "nodes": [
+    {
+      "parameters": {
+        "resource": "image",
+        "operation": "analyze",
+        "modelId": {
+          "__rl": true,
+          "value": "models/gemini-2.5-flash",
+          "mode": "list",
+          "cachedResultName": "models/gemini-2.5-flash"
+        },
+        "text": "อ่านสลิปหรือหน้าจอยืนยันการโอนเงินในรูปนี้ อาจมาจากธนาคารหรือแอปใดก็ได้ทั้งในไทยและต่างประเทศ (ธนาคาร, e-wallet, พร้อมเพย์, บริการโอนเงินระหว่างประเทศ) และอาจเป็นภาษาใดก็ได้\nตอบเป็น JSON ล้วนอย่างเดียว ไม่ต้องครอบด้วย ``` และห้ามมีคำอธิบายอื่น\n\n{\n  \"is_bank_slip\": true/false,\n  \"amount\": 0,\n  \"transfer_datetime\": \"\",\n  \"receiver_name\": \"\",\n  \"reference_number\": \"\",\n  \"receiver_bank\": \"\",\n}\n\nกติกา\n- is_bank_slip: true เฉพาะเมื่อเป็นสลิปหรือหน้าจอยืนยันการโอนที่สำเร็จแล้ว ถ้าเป็นรูปอื่น รายการไม่สำเร็จ หรือรูปไม่ชัดจนอ่านยอดไม่ได้ ให้เป็น false\n- amount: ยอดเงินที่โอน เป็นตัวเลขล้วน ไม่มีคอมมาและหน่วย ห้ามใช้ค่าธรรมเนียมหรือยอดคงเหลือ มีทศนิยมด้วย\n- transfer_datetime: รูปแบบ YYYY-MM-DDTHH:mm:ss+07:00\n  · ปี พ.ศ. 4 หลักให้ลบ 543 (2569 = 2026) · ปี 2 หลัก เช่น 69 คือ พ.ศ. 2569 = 2026\n  · เดือนย่อไทย: ม.ค.=01 ก.พ.=02 มี.ค.=03 เม.ย.=04 พ.ค.=05 มิ.ย.=06 ก.ค.=07 ส.ค.=08 ก.ย.=09 ต.ค.=10 พ.ย.=11 ธ.ค.=12\n  · ถ้าไม่มีวินาทีให้ใส่ 00\n- receiver_name: ชื่อผู้รับตามที่เห็นบนสลิป ถ้าไม่มีชื่อให้ใช้เบอร์หรือเลขพร้อมเพย์ที่แสดงแทน\n- reference_number: ใช้ \"เลขที่รายการ\" ก่อน ถ้าไม่มีให้ใช้ \"รหัสอ้างอิง\" / \"Ref No.\" / \"Transaction ID\" ตามลำดับ คัดลอกตามสลิปทุกตัวอักษร ไม่เว้นวรรค\n- receiver_bank: ชื่อธนาคารหรือแอปของฝั่งผู้รับ ดูจากข้อความหรือโลโก้ฝั่งผู้รับ ให้ตอบเป็นชื่อเต็มภาษาอังกฤษตามรายการนี้เท่านั้น: Kasikorn Bank, Siam Commercial Bank, Krungthai Bank, Bangkok Bank, Bank of Ayudhya, TMBThanachart Bank, Government Savings Bank, TrueMoney Wallet, PromptPay ถ้าเป็นธนาคารอื่นให้ใช้ชื่อเต็มภาษาอังกฤษตามสลิป ถ้าไม่แสดงให้ใส่ \"\" ห้ามใช้ธนาคารของผู้โอน\n\nช่องไหนอ่านไม่ออกให้ใส่ \"\" (หรือ 0 สำหรับ amount) ห้ามเดา",
+        "inputType": "binary",
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.googleGemini",
+      "typeVersion": 1.2,
+      "position": [
+        688,
+        -64
+      ],
+      "id": "2edf7f59-ccf9-4386-86cc-b88823339f71",
+      "name": "Analyze an image",
+      "credentials": {
+        "googlePalmApi": {
+          "id": "3RAuQThmC0JZC4yH",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "download",
+        "fileId": {
+          "__rl": true,
+          "value": "={{ $json[Object.keys($json).find(k => k.startsWith('อัปโหลดสลิป'))].split('id=')[1] }}",
+          "mode": "id"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleDrive",
+      "typeVersion": 3,
+      "position": [
+        464,
+        -64
+      ],
+      "id": "7a5095e6-21b0-4a43-94ec-60ebb6196bc1",
+      "name": "Download file",
+      "credentials": {
+        "googleDriveOAuth2Api": {
+          "id": "Rh8vA4QyBljrGBko",
+          "name": "Google Drive account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "operation": "update",
+        "documentId": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/17U20PQzSD8UZar2wtQd7sI3-FcwycI0oVc9BjHmlbvI/edit?gid=1541114027#gid=1541114027",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "form1",
+          "mode": "name"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "reference_number": "={{ $json.reference_number }}",
+            "paid_amount": "={{ $json.paid_amount }}",
+            "receiver": "={{ $json.receiver }}",
+            "check_valid": "={{ $json.check_valid }}",
+            "fail_reason": "={{ $json.fail_reason }}",
+            "อัปโหลดสลิป\nPrice = 200": "={{ $json.slip_link }}"
+          },
+          "matchingColumns": [
+            "อัปโหลดสลิป\nPrice = 200"
+          ],
+          "schema": [
+            {
+              "id": "ประทับเวลา",
+              "displayName": "ประทับเวลา",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "ชื่อผู้โอน\nรูปแบบ: ชื่อจริง นามสกุล (ไม่ต้องมีคำนำหน้า)",
+              "displayName": "ชื่อผู้โอน\nรูปแบบ: ชื่อจริง นามสกุล (ไม่ต้องมีคำนำหน้า)",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "อัปโหลดสลิป\nPrice = 200",
+              "displayName": "อัปโหลดสลิป\nPrice = 200",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "จำนวนสินค้า",
+              "displayName": "จำนวนสินค้า",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "reference_number",
+              "displayName": "reference_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "paid_amount",
+              "displayName": "paid_amount",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "receiver",
+              "displayName": "receiver",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "check_valid",
+              "displayName": "check_valid",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "fail_reason",
+              "displayName": "fail_reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "number",
+              "canBeUsedToMatch": true,
+              "readOnly": true,
+              "removed": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {
+          "cellFormat": "RAW"
+        }
+      },
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.7,
+      "position": [
+        1136,
+        -64
+      ],
+      "id": "0c26d8c6-5f76-450f-9045-6389de108b34",
+      "name": "Update row in sheet",
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "T3s8nh2ucRoJOdwR",
+          "name": "Google Sheets account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const text = $json.content.parts[0].text;\nconst slip = JSON.parse(text.replace(/```json|```/g, '').trim());\nconst row = $('Google Sheets Trigger').item.json;\nconst slipKey = Object.keys(row).find(k => k.startsWith('อัปโหลดสลิป'));\n\nconst result = {\n  slip_link: row[slipKey],\n  reference_number: '',\n  paid_amount: '',\n  receiver: '',\n  check_valid: false,\n  fail_reason: '',\n};\n\n// ไม่ใช่สลิป → ทุกช่องเป็น \"\" และ check_valid = FALSE\nif (slip.is_bank_slip !== true) {\n  return { json: result };\n}\n\n// เป็นสลิป → ใส่ข้อมูลจากสลิป (เงื่อนไขอื่นจะเพิ่มตรงนี้)\nresult.reference_number = slip.reference_number;\nresult.paid_amount = slip.amount;\nresult.receiver = slip.receiver_name;\nresult.check_valid = true;\nreturn { json: result };"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        912,
+        -64
+      ],
+      "id": "ea653f84-9d61-433a-a56d-b5af541b3311",
+      "name": "Code in JavaScript"
+    },
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "documentId": {
+          "__rl": true,
+          "value": "https://docs.google.com/spreadsheets/d/17U20PQzSD8UZar2wtQd7sI3-FcwycI0oVc9BjHmlbvI/edit?usp=sharing",
+          "mode": "url"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": 1541114027,
+          "mode": "list",
+          "cachedResultName": "form1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/17U20PQzSD8UZar2wtQd7sI3-FcwycI0oVc9BjHmlbvI/edit#gid=1541114027"
+        },
+        "event": "rowAdded",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.googleSheetsTrigger",
+      "typeVersion": 1,
+      "position": [
+        224,
+        -64
+      ],
+      "id": "44db274a-1f49-4f15-b7f0-e0a9b853b92c",
+      "name": "Google Sheets Trigger",
+      "credentials": {
+        "googleSheetsTriggerOAuth2Api": {
+          "id": "Jyyb0sdbhr1J1S8U",
+          "name": "Google Sheets Trigger account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Download file": {
+      "main": [
+        [
+          {
+            "node": "Analyze an image",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze an image": {
+      "main": [
+        [
+          {
+            "node": "Code in JavaScript",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Code in JavaScript": {
+      "main": [
+        [
+          {
+            "node": "Update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Sheets Trigger": {
+      "main": [
+        [
+          {
+            "node": "Download file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "221baee6-ea5f-4346-a82b-a9e4ebc2f174",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "a5711f35ce9164d6ff8abf7aaca5716bc84a52081390ab3afb60564e4bd04ced"
+  },
+  "nodeGroups": [],
+  "id": "dUzMPu2ea4xxDOMn",
+  "tags": []
+}
